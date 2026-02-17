@@ -1,68 +1,47 @@
-import matplotlib.pyplot as plt
-import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 from data_loader import load_data
-from signals import moving_average_signal
-from risk import apply_volatility_targeting
+from signals import momentum_signal
+from risk import volatility_scaling
 
 
-def run_backtest(ticker="SPY"):
-
-    # 1. Load data
-    data = load_data(ticker)
-
-    # 2. Generate signals
-    data = moving_average_signal(data)
-
-    # 3. Apply volatility targeting
-    data = apply_volatility_targeting(data)
-
-    # 4. Strategy returns
-    data['strategy_returns'] = data['position'].shift(1) * data['returns']
-
-    # 5. Equity curve
-    data['equity_curve'] = (1 + data['strategy_returns']).cumprod()
-
-    # Buy & Hold comparison
-    data['buy_hold'] = (1 + data['returns']).cumprod()
-
-    return data
+TICKERS = ["SPY", "TLT", "GLD", "DBC"]
 
 
-def performance_metrics(data):
+def run_backtest():
 
-    returns = data['strategy_returns'].dropna()
+    # Load data
+    prices, returns = load_data(TICKERS)
 
-    sharpe = np.sqrt(252) * returns.mean() / returns.std()
+    # Signals
+    signals = momentum_signal(prices)
 
-    # Max Drawdown
-    equity = data['equity_curve']
-    peak = equity.cummax()
-    drawdown = (equity - peak) / peak
-    max_dd = drawdown.min()
+    # Risk scaling
+    positions = volatility_scaling(returns, signals)
 
-    return sharpe, max_dd
+    # Portfolio returns (equal-weighted across assets)
+    strategy_returns = (positions.shift(1) * returns).mean(axis=1)
+
+    equity_curve = (1 + strategy_returns).cumprod()
+
+    # Buy & Hold SPY comparison
+    buy_hold = (1 + returns["SPY"]).cumprod()
+
+    return equity_curve, buy_hold
 
 
 if __name__ == "__main__":
 
-    data = run_backtest()
+    equity_curve, buy_hold = run_backtest()
 
-    sharpe, max_dd = performance_metrics(data)
-
-    print("Sharpe Ratio:", round(sharpe, 2))
-    print("Max Drawdown:", round(max_dd, 2))
-
-    # Plot equity curve
     plt.figure(figsize=(10,6))
-    plt.plot(data['equity_curve'], label="Volatility Scaled Strategy")
-    plt.plot(data['buy_hold'], label="Buy & Hold")
-    plt.title("Strategy vs Buy & Hold")
+    plt.plot(buy_hold, label="Buy & Hold SPY")
+    plt.plot(equity_curve, label="Multi-Asset Momentum Portfolio")
+
+    plt.title("Multi-Asset Momentum vs Equity Market")
     plt.legend()
     plt.grid(True)
 
-    # Save plot
-    plt.savefig("../results/equity_curve.png")
-
+    plt.savefig("../results/multi_asset.png")
     plt.show()

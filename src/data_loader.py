@@ -2,21 +2,18 @@ import yfinance as yf
 import pandas as pd
 
 
-def load_data(ticker="SPY", start="2010-01-01"):
+def load_data(tickers, start="2010-01-01"):
     """
-    Downloads historical price data and computes returns.
+    Downloads multiple asset price data and computes returns.
     """
 
-    data = yf.download(ticker, start=start, auto_adjust=True)
+    data = yf.download(tickers, start=start, auto_adjust=True)['Close']
 
-    # Use Close price (already adjusted when auto_adjust=True)
-    data = data[['Close']].copy()
-    data.rename(columns={'Close': 'price'}, inplace=True)
+    # If single column, convert to DataFrame
+    if isinstance(data, pd.Series):
+        data = data.to_frame()
 
-    # daily returns
-    data['returns'] = data['price'].pct_change()
+    # Daily returns
+    returns = data.pct_change()
 
-    # remove missing values
-    data.dropna(inplace=True)
-
-    return data
+    return data, returns
